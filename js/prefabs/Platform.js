@@ -1,6 +1,6 @@
 var MrHop = MrHop || {};
 
-MrHop.Platform = function(game, floorPool, numTiles, x, y) {
+MrHop.Platform = function(game, floorPool, numTiles, x, y, speed) {
   Phaser.Group.call(this, game);
   
   this.tileSize = 40;
@@ -9,7 +9,7 @@ MrHop.Platform = function(game, floorPool, numTiles, x, y) {
   this.enableBody = true;
   this.floorPool = floorPool;
 
-  this.prepare(numTiles, x, y)
+  this.prepare(numTiles, x, y, speed)
   
  
 };
@@ -17,8 +17,10 @@ MrHop.Platform = function(game, floorPool, numTiles, x, y) {
 MrHop.Platform.prototype = Object.create(Phaser.Group.prototype);
 MrHop.Platform.prototype.constructor = MrHop.Platform;
 
-MrHop.Platform.prototype.prepare = function(numTiles, x, y) {
+MrHop.Platform.prototype.prepare = function(numTiles, x, y, speed) {
   var i = 0;
+  this.alive = true;
+
   while(i < numTiles){
 
     var floorTile = this.floorPool.getFirstExists(false);
@@ -38,4 +40,20 @@ MrHop.Platform.prototype.prepare = function(numTiles, x, y) {
 
   this.setAll('body.immovable', true);
   this.setAll('body.allowGravity', false);
+  this.setAll('body.velocity.x', speed);
+}
+
+MrHop.Platform.prototype.kill = function() {
+  this.alive = false;
+  this.callAll('kill');
+
+  sprites = [];
+
+  this.forEach(function(tile) {
+    sprites.push(tile)
+  }, this)
+
+  sprites.forEach(function(tile) {
+    this.floorPool.add(tile);
+  }, this);
 }
