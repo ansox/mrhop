@@ -18,11 +18,27 @@ MrHop.GameState = {
 
     //coins
 
+    this.coinsPool = this.add.group();
+    this.coinsPool.enableBody = true;
+
     this.myCoins = 0;
 
     this.levelSpeed = 200;
   },
   create: function() {
+    this.background = this.add.tileSprite(0, 0, this.game.world.width,
+       this.game.world.height, 'background');
+
+    this.background.tileScale.y = 2;
+
+    this.background.autoScroll(-this.levelSpeed / 6, 0);
+    this.game.world.sendToBack(this.background);
+
+    this.water = this.add.tileSprite(0, this.game.world.height - 30, this.game.world.width, 
+      30, 'water');
+
+    this.water.autoScroll(-this.levelSpeed * 1.1, 0);
+
     //player
     this.player = this.add.sprite(50, 50, 'player');
     this.player.anchor.setTo(0.5);
@@ -32,41 +48,65 @@ MrHop.GameState = {
     this.player.play('running');
 
     //hard-code first platform
-    this.currentPlatform = new MrHop.Platform(this.game, this.floorPool, 12  , 0, 200, -this.levelSpeed);
+    this.currentPlatform = new MrHop.Platform(this.game, this.floorPool, 12  , 0, 200, -this.levelSpeed, this.coinsPool);
     this.platformPool.add(this.currentPlatform);
 
     this.loadLevel();
+
+    this.coinSound = this.add.audio('coin');
+
+    var style = {
+      font: '30px Arial', 
+      fill: '#fff'
+    }
+
+    this.coinsCountLabel = this.add.text(10, 20, '0', style);
   },   
 
   update: function() {    
-    this.platformPool.forEachAlive(function(platform, index) {
-      this.game.physics.arcade.collide(this.player, platform);
-
-      if (platform.length && 
-        platform.children[platform.length - 1].right < 0) {
-        platform.kill();
+    if (this.player.alive) {
+      this.platformPool.forEachAlive(function(platform, index) {
+        this.game.physics.arcade.collide(this.player, platform);
+  
+        if (platform.length && 
+          platform.children[platform.length - 1].right < 0) {
+          platform.kill();
+        }
+    
+      }, this);
+  
+  
+      if (this.player.body.touching.down) {
+        this.player.body.velocity.x = this.levelSpeed;      
+      }
+      else {
+        this.player.body.velocity.x = 0;      
       }
   
-    }, this);
-
-    if (this.player.body.touching.down) {
-      this.player.body.velocity.x = this.levelSpeed;      
+      if (this.cursors.up.isDown || this.game.input.activePointer.isDown) {
+        this.playerJump();
+      } else if (this.cursors.up.isUp || this.game.input.activePointer.isUp) {
+        this.isJump = false;
+      }
+  
+      if (this.currentPlatform.length && 
+        this.currentPlatform.children[this.currentPlatform.length - 1].right < this.game.world.width) {
+          this.createPlatform();
+      }
+  
+      this.coinsPool.forEachAlive(function(coin) {
+        if (coin.right <= 0) {
+          
+          coin.kill();        
+        }
+      }, this);
+  
+      this.game.physics.arcade.overlap(this.player, this.coinsPool, this.collectCoin, null, this);
     }
-    else {
-      this.player.body.velocity.x = 0;      
+    
+    if(this.player.top >= this.game.world.height || this.player.left <= 0) {
+      this.gameOver();
     }
-
-    if (this.cursors.up.isDown || this.game.input.activePointer.isDown) {
-      this.playerJump();
-    } else if (this.cursors.up.isUp || this.game.input.activePointer.isUp) {
-      this.isJump = false;
-    }
-
-    if (this.currentPlatform.length && 
-      this.currentPlatform.children[this.currentPlatform.length - 1].right < this.game.world.width) {
-        this.createPlatform();
-    }
-
 
   } ,
 
@@ -106,7 +146,7 @@ MrHop.GameState = {
       if (!this.currentPlatform) {
         this.currentPlatform = new MrHop.Platform(this.game, this.floorPool, 
           nextPlatformData.numTiles, this.game.world.width + nextPlatformData.separation,
-          nextPlatformData.y, -this.levelSpeed);
+          nextPlatformData.y, -this.levelSpeed, this.coinsPool);
       } else {
         this.currentPlatform.prepare(nextPlatformData.numTiles, this.game.world.width + nextPlatformData.separation,
           nextPlatformData.y, -this.levelSpeed);
@@ -134,6 +174,72 @@ MrHop.GameState = {
     data.numTiles = minTile + Math.random() * (maxTile - minTile);
 
     return data;
+  },
+
+  collectCoin: function(player, coin) {
+    coin.kill();
+    this.myCoins++;
+    this.coinSound.play();  
+    this.coinsCountLabel.text = this.myCoins;
+  },
+
+  gameOver: function() {
+    if (!this.theEnd) {
+      this.theEnd = true;
+      this.player.kill();
+      
+          this.updateHighScore();
+      
+          //overlay
+          this.overlay = this.add.bitmapData(this.game.width, this.game.height);
+          this.overlay.ctx.fillStyle = "#000";
+          this.overlay.ctx.fillRect(0, 0, this.game.width, this.game.height);
+      
+          this.panel = this.add.sprite(0, this.game.height, this.overlay);
+          this.panel.alpha = 0.55;
+      
+          var gameOverPanel = this.add.tween(this.panel);
+          gameOverPanel.to({y: 0}, 500);
+      
+          gameOverPanel.onComplete.add(function() {
+            this.water.stopScroll();
+            this.background.stopScroll();
+      
+            var style = {font: '30px Arial', fill: '#fff'};
+            this.add.text(this.game.width/2, this.game.height/2, 'Game Over', style).anchor.setTo(0.5);
+            this.add.text(this.game.width/2, this.game.height/2 + 50, 'High Score:' + this.highScore, style).anchor.setTo(0.5);
+            this.add.text(this.game.width/2, this.game.height/2 + 80, 'Your Score:' + this.myCoins, style).anchor.setTo(0.5);
+            
+            var style = {font: '10px Arial', fill: '#fff'};
+            this.add.text(this.game.width/2, this.game.height/2 + 120, 'Tap to play again', style).anchor.setTo(0.5);
+            
+            this.game.input.onDown.addOnce(this.restart, this);
+          }, this);
+      
+          gameOverPanel.start();
+          // this.restart();
+    }
+    
+  },
+
+  updateHighScore: function() {
+    this.highScore = +localStorage.getItem('highscore');
+
+    if (this.myCoins > this.highScore) {
+      this.highScore = this.myCoins;
+      localStorage.setItem('highscore', this.highScore);      
+    }
+  },
+
+  restart: function() {
+    this.theEnd = false;
+    //bug do phaser
+    this.game.world.remove(this.background);
+    this.game.world.remove(this.water);
+    //
+    
+
+    this.game.state.start('Game');
   }
   // render: function() {
   //   this.game.debug.body(this.player);

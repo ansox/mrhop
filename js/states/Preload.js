@@ -17,7 +17,7 @@ MrHop.PreloadState = {
     this.load.image('coin', 'assets/images/coin.png');
     this.load.image('background', 'assets/images/background.png');
     this.load.spritesheet('player', 'assets/images/player_spritesheet.png', 51, 67, 5, 2, 3);
-    // this.load.audio('coin', ['assets/audio/coin.mp3', 'assets/audio/coin.ogg']);
+    this.load.audio('coin', ['assets/audio/coin.mp3', 'assets/audio/coin.ogg']);
   },
   create: function() {
     this.state.start('Game');
